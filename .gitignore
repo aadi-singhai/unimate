@@ -1,0 +1,10 @@
+# Backend
+backend/node_modules
+backend/.env
+backend/serviceAccountKey.json
+
+# App
+app/node_modules
+
+# Admin
+admin/node_modules

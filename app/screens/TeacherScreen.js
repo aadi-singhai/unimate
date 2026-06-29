@@ -21,6 +21,7 @@ export default function TeacherScreen() {
         teacherUid: user.uid,
         subject,
         classId,
+        roomId,
       });
       setQrImage(res.data.qrImage);
       setExpiresAt(res.data.expiresAt);

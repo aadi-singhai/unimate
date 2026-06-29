@@ -6,8 +6,6 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { BACKEND_URL } from "../config";
 
-const COLLEGE_SSID = "YourCollegeWiFiName";
-
 export default function StudentScreen() {
   const { user, logout } = useAuth();
   const [scanning, setScanning] = useState(false);
@@ -19,23 +17,59 @@ export default function StudentScreen() {
     setScanning(false);
 
     try {
-      const { sessionId } = JSON.parse(data);
+      // Parse QR data
+      let parsed;
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        return Alert.alert("Error", "Invalid QR code.");
+      }
 
-      const deviceId = Application.androidId ||
-                       await Application.getIosIdForVendorAsync() ||
-                       "unknown";
+      const { sessionId, classId, roomId } = parsed;
+      if (!sessionId) return Alert.alert("Error", "QR code is missing session info.");
 
-      const res = await axios.post(`${BACKEND_URL}/api/session/mark`, {
-        sessionId,
-        studentUid: user.uid,
-        ssid: COLLEGE_SSID,
-        deviceId,
-      });
+      // Get student UID — handles both 'uid' and '_id' field names
+      const studentUid = user?.uid || user?._id;
+      if (!studentUid) {
+        return Alert.alert("Error", "Could not identify your account. Please log out and log in again.");
+      }
+
+      // Get device ID safely
+      let deviceId = "unknown";
+      try {
+        if (Application.androidId) {
+          deviceId = Application.androidId;
+        } else {
+          deviceId = (await Application.getIosIdForVendorAsync()) || "unknown";
+        }
+      } catch {
+        deviceId = "unknown";
+      }
+
+      console.log("Marking attendance:", { sessionId, studentUid, deviceId, backendUrl: BACKEND_URL });
+
+      const res = await axios.post(
+        `${BACKEND_URL}/api/session/mark`,
+        {
+          sessionId,
+          studentUid,
+          ssid: "Aadi_Singhai", // must match COLLEGE_WIFI_SSID in .env
+          deviceId,
+        },
+        { timeout: 10000 } // 10 second timeout so it doesn't hang silently
+      );
 
       setMarked(true);
       Alert.alert("✅ Success", res.data.message);
     } catch (err) {
-      Alert.alert("Failed", err.response?.data?.error || "Something went wrong");
+      // Show the most useful error message available
+      const message =
+        err.response?.data?.error ||   // backend error (e.g. "QR expired")
+        err.message ||                  // axios/network error (e.g. "Network Error")
+        "Something went wrong";
+
+      console.log("Attendance error:", err.message, err.response?.data);
+      Alert.alert("Failed", message);
     }
   };
 
